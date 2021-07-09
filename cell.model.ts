@@ -1,5 +1,7 @@
 import { GridSubCollection } from './sub-collections.model';
 import { red, blue, cyan, magenta, grey, gray, green, white, yellow } from 'colors/safe';
+import { get } from 'config';
+const color = get<boolean>('color');
 
 export class Cell {
     column: number;
@@ -71,7 +73,7 @@ export class Cell {
         if (!this.value) {
             return '_';
         }
-        if (process.env.color !== '1') {
+        if (!color) {
             return this.value;
         }
         switch (this.value) {

@@ -1,17 +1,23 @@
 import { Cell } from "./cell.model";
 import { Grid } from "./grid.model";
+import { get } from 'config';
+const verbose = get<boolean>('verbose');
+const cellChecksEntities = get<boolean>('cellChecksEntities');
 
 export const oneToNine = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 type EntityType = "unset" | "square" | "line" | "column";
+
 export class GridSubCollection {
     cells: Cell[];
     solved: boolean;
+    grid: Grid;
     entityType: EntityType;
     index: number;
     lockedOnPositions: Record<number, Cell[]>;
 
-    constructor(cells: Cell[], index: number, entityType: EntityType = "unset") {
+    constructor(grid: Grid, cells: Cell[], index: number, entityType: EntityType = "unset") {
+        this.grid = grid;
         this.entityType = entityType;
         this.cells = cells;
         this.index = index;
@@ -31,7 +37,10 @@ export class GridSubCollection {
     }
 
     hasValue(valueToCheck: number): boolean {
-        return this.cells.some(({ value }) => valueToCheck === value);
+        return this.cells.some(({ value }) => {
+            this.grid.incrementSteps();
+            return valueToCheck === value;
+        });
     }
 
     hasValueNotOnSquare(valueToCheck: number, square: Square): boolean {
@@ -41,24 +50,33 @@ export class GridSubCollection {
         }
         if (this.lockedOnPositions[valueToCheck]) {
             if (this.entityType === "line") {
-                return this.lockedOnPositions[valueToCheck].some(cell =>
-                    !square.columns.some(e => e === cell.column)
-                );
+                return this.lockedOnPositions[valueToCheck].some(cell => {
+                    this.grid.incrementSteps();
+                    return !square.columns.some(e => e === cell.column);
+                });
             } else if (this.entityType === "column") {
-                return this.lockedOnPositions[valueToCheck].some(cell =>
-                    !square.lines.some(e => e === cell.line)
-                );
+                return this.lockedOnPositions[valueToCheck].some(cell => {
+
+                    this.grid.incrementSteps();
+                    return !square.lines.some(e => e === cell.line);
+                });
             }
         }
         return false;
     }
 
     get freeCells(): Cell[] {
-        return this.cells.filter(({ value }) => !value);
+        return this.cells.filter(({ value }) => {
+            this.grid.incrementSteps();
+            return !value;
+        });
     }
 
     get missingValues(): number[] {
-        return [...oneToNine].filter(v => !this.cells.some(({ value }) => value === v));
+        return [...oneToNine].filter(v => !this.cells.some(({ value }) => {
+            this.grid.incrementSteps();
+            return value === v;
+        }));
     }
 
     checkSolved(): void {
@@ -84,10 +102,10 @@ export class GridSubCollection {
     ): Cell[] {
         let cells: Cell[] = [cell];
         cell.value = value;
-        if (process.env.verbose === '1') {
+        if (verbose) {
             console.log(`Found value from ${origin} on ${this.entityType} for ${cell.line + 1} - ${cell.column + 1}: ${cell.value}`);
         }
-        if (process.env.cellChecksEntities === '1') {
+        if (cellChecksEntities) {
             const otherCells = cell.checkEntities();
             cells = [cell, ...otherCells];
         }
@@ -123,7 +141,10 @@ export class GridSubCollection {
         }
         const missingValues = this.missingValues;
         if (missingValues.length === 1) {
-            const cell = this.cells.find(({ value }) => !value) as Cell;
+            const cell = this.cells.find(({ value }) => {
+                this.grid.incrementSteps();
+                return !value;
+            }) as Cell;
             return this.settingCell(cell, missingValues[0], "solveIfOneMissing");
         }
         return [];
@@ -152,8 +173,8 @@ export class Square extends GridSubCollection {
     lines: number[];
     columns: number[];
 
-    constructor(cells: Cell[], index: number) {
-        super(cells, index, "square");
+    constructor(grid: Grid, cells: Cell[], index: number) {
+        super(grid, cells, index, "square");
         this.lines = [cells[0].line, cells[3].line, cells[6].line];
         this.columns = [cells[0].column, cells[1].column, cells[2].column];
     }
@@ -183,14 +204,14 @@ export class Square extends GridSubCollection {
 }
 
 export class Line extends GridSubCollection {
-    constructor(cells: Cell[], index: number) {
-        super(cells, index, "line");
+    constructor(grid: Grid, cells: Cell[], index: number) {
+        super(grid, cells, index, "line");
     }
 }
 
 export class Column extends GridSubCollection {
-    constructor(cells: Cell[], index: number) {
-        super(cells, index, "column");
+    constructor(grid: Grid, cells: Cell[], index: number) {
+        super(grid, cells, index, "column");
     }
 }
 

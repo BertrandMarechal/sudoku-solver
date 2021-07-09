@@ -1,5 +1,7 @@
 import { Cell } from "./cell.model";
 import { Column, Line, oneToNine, Square } from "./sub-collections.model";
+import { get } from "config";
+const stopOnFirstSuccessfulSubGrid = get<boolean>('stopOnFirstSuccessfulSubGrid');
 
 export class Grid {
     root: Grid | null;
@@ -14,8 +16,10 @@ export class Grid {
     startTime: number;
     endTime: number;
     totalTime: number;
+    stepCount: number;
 
-    constructor(grid: string, root: Grid | null = null) {
+    constructor(grid: string, root: Grid | null = null, parent: Grid | null = null) {
+        this.stepCount = 0;
         this.subGrids = [];
         this.cells = [];
         this.squares = [];
@@ -28,6 +32,9 @@ export class Grid {
         this.root = root;
         if (this.root) {
             this.root.subGrids.push(this);
+            if (parent) {
+                this.stepCount = parent.stepCount;
+            }
         }
         this.startTime = new Date().getTime();
         this.endTime = new Date().getTime();
@@ -40,10 +47,10 @@ export class Grid {
             .map(n => n === " " ? null : +n)
             .map((v, i) => new Cell(v, i));
         for (let i = 0; i < 9; i++) {
-            this.lines.push(new Line(this.cells.slice(9 * i, 9 + 9 * i), i));
+            this.lines.push(new Line(this, this.cells.slice(9 * i, 9 + 9 * i), i));
         }
         for (let i = 0; i < 9; i++) {
-            this.columns.push(new Column([
+            this.columns.push(new Column(this, [
                 this.lines[0].cells[i],
                 this.lines[1].cells[i],
                 this.lines[2].cells[i],
@@ -57,7 +64,7 @@ export class Grid {
         }
         for (let i = 0; i < 3; i++) {
             for (let j = 0; j < 3; j++) {
-                this.squares.push(new Square([
+                this.squares.push(new Square(this, [
                     ...this.lines[3 * i].cells.slice(3 * j, 3 + 3 * j),
                     ...this.lines[1 + 3 * i].cells.slice(3 * j, 3 + 3 * j),
                     ...this.lines[2 + 3 * i].cells.slice(3 * j, 3 + 3 * j),
@@ -124,6 +131,7 @@ export class Grid {
                 console.log(`Solved: ${this.solved}`);
                 this.startTime = new Date().getTime();
                 console.log(`Total time: ${this.totalTime} ms`);
+                console.log(`Total steps: ${this.stepCount}`);
             }
 
             if (!this.solved) {
@@ -136,6 +144,7 @@ export class Grid {
                         const validSubGrids = this.subGrids.filter(({ solved }) => solved);
                         if (validSubGrids.length) {
                             console.log(validSubGrids[validSubGrids.length - 1].toString());
+                            console.log(`Total steps: ${validSubGrids[validSubGrids.length - 1].stepCount}`);
                         }
                         console.log(`Total time: ${this.subGrids[this.subGrids.length - 1].endTime - this.startTime} ms`);
 
@@ -237,9 +246,12 @@ export class Grid {
                 );
             }
             for (const missingValue of missingValues) {
-                const cellsOfValue = freeCells.filter(cell =>
-                    cell.potentialValues.some(value => value === missingValue)
-                );
+                const cellsOfValue = freeCells.filter(cell => {
+                    return cell.potentialValues.some(value => {
+                        this.incrementSteps();
+                        return value === missingValue;
+                    });
+                });
                 const lines = cellsOfValue.reduce((agg: number[], { line }) => {
                     if (!agg.some(value => value === line)) {
                         agg.push(line);
@@ -321,9 +333,13 @@ export class Grid {
             }
         }
         for (const option of options) {
-            const grid = new Grid(this.toRawString(option), this.root || this);
+            const grid = new Grid(
+                this.toRawString(option),
+                this.root || this,
+                this
+            );
             grid.solve();
-            if (grid.solved && process.env.stopOnFirstSuccessfulSubGrid === '1') {
+            if (grid.solved && stopOnFirstSuccessfulSubGrid) {
                 return true;
             }
         }
@@ -333,6 +349,10 @@ export class Grid {
             }
         }
         return false;
+    }
+
+    incrementSteps(count?: number) {
+        this.stepCount += count || 1;
     }
 }
 
