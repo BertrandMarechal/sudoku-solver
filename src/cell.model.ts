@@ -1,19 +1,32 @@
 import { GridSubCollection } from './sub-collections.model';
-import { red, blue, cyan, magenta, grey, gray, green, white, yellow } from 'colors/safe';
+import { blue, cyan, gray, green, grey, magenta, red, white, yellow } from 'colors/safe';
 import { get } from 'config';
+
+const useSubCollectionValueMaps = get<boolean>('useSubCollectionValueMaps');
 const color = get<boolean>('color');
 
 export class Cell {
+    set value(value: number | null) {
+        this._value = value;
+        if (useSubCollectionValueMaps) {
+            this.columnEntity?.cellSet(this);
+            this.lineEntity?.cellSet(this);
+            this.squareEntity?.cellSet(this);
+        }
+    }
+    get value(): number | null {
+        return this._value;
+    }
     column: number;
     line: number;
-    value: number | null;
+    private _value: number | null;
     potentialValues: number[];
     lineEntity: GridSubCollection | null;
     columnEntity: GridSubCollection | null;
     squareEntity: GridSubCollection | null;
 
     constructor(value: number | null, index: number) {
-        this.value = value;
+        this._value = value;
         this.column = index % 9;
         this.line = Math.floor(index / 9);
         this.potentialValues = [];
@@ -37,32 +50,11 @@ export class Cell {
     }
 
     checkEntities(): Cell[] {
-        let cellsFound: Cell[] = [];
-        if (this.columnEntity) {
-            const columnCells = [
-                ...this.columnEntity.solveIfOneMissing(),
-            ];
-            cellsFound = [
-                ...cellsFound, ...columnCells
-            ];
-        }
-        if (this.lineEntity) {
-            const lineCells = [
-                ...this.lineEntity.solveIfOneMissing(),
-            ];
-            cellsFound = [
-                ...cellsFound, ...lineCells
-            ];
-        }
-        if (this.squareEntity) {
-            const squareCells = [
-                ...this.squareEntity.solveIfOneMissing(),
-            ];
-            cellsFound = [
-                ...cellsFound, ...squareCells
-            ];
-        }
-        return cellsFound;
+        return [
+            ...this.columnEntity?.solveIfOneMissing() || [],
+            ...this.lineEntity?.solveIfOneMissing() || [],
+            ...this.squareEntity?.solveIfOneMissing() || [],
+        ];
     }
 
     toString() {
