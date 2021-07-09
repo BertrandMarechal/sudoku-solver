@@ -116,20 +116,19 @@ export class GridSubCollection {
         if (this.solved) {
             return [];
         }
-        for (let v = 1; v < 10; v++) {
-            if (!this.hasValue(v)) {
-                const availableCells: Cell[] = [];
-                const freeCells = this.freeCells;
-                for (const cell of freeCells) {
-                    if (!grid.lines[cell.line].hasValue(v) &&
-                        !grid.columns[cell.column].hasValue(v)) {
-                        availableCells.push(cell);
-                    }
+        const missingValues = this.missingValues;
+        for (const v of missingValues) {
+            const availableCells: Cell[] = [];
+            const freeCells = this.freeCells;
+            for (const cell of freeCells) {
+                if (!grid.lines[cell.line].hasValue(v) &&
+                    !grid.columns[cell.column].hasValue(v)) {
+                    availableCells.push(cell);
                 }
-                if (availableCells.length === 1) {
-                    const cell = availableCells[0];
-                    return this.settingCell(cell, v, "solveValuesBySimpleCross");
-                }
+            }
+            if (availableCells.length === 1) {
+                const cell = availableCells[0];
+                return this.settingCell(cell, v, "solveValuesBySimpleCross");
             }
         }
         return [];
@@ -183,20 +182,19 @@ export class Square extends GridSubCollection {
         if (this.solved) {
             return [];
         }
-        for (let v = 1; v < 10; v++) {
-            if (!this.hasValue(v)) {
-                const availableCells: Cell[] = [];
-                const freeCells = this.freeCells;
-                for (const cell of freeCells) {
-                    if (!grid.lines[cell.line].hasValueNotOnSquare(v, this) &&
-                        !grid.columns[cell.column].hasValueNotOnSquare(v, this)) {
-                        availableCells.push(cell);
-                    }
+        const missingValues = this.missingValues;
+        for (const v of missingValues) {
+            const availableCells: Cell[] = [];
+            const freeCells = this.freeCells;
+            for (const cell of freeCells) {
+                if (!grid.lines[cell.line].hasValueNotOnSquare(v, this) &&
+                    !grid.columns[cell.column].hasValueNotOnSquare(v, this)) {
+                    availableCells.push(cell);
                 }
-                if (availableCells.length === 1) {
-                    const cell = availableCells[0];
-                    return this.settingCell(cell, v, "solveValuesByComplexCross");
-                }
+            }
+            if (availableCells.length === 1) {
+                const cell = availableCells[0];
+                return this.settingCell(cell, v, "solveValuesByComplexCross");
             }
         }
         return [];
