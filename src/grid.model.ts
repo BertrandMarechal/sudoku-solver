@@ -33,14 +33,13 @@ export class Grid {
         this.known = false;
         this.init(grid);
         this.root = root;
+        this.level = 0;
         if (this.root) {
             this.root.subGrids.push(this);
             if (parent) {
                 this.level = parent.level + 1;
                 this.stepCount = parent.stepCount;
             }
-        } else {
-            this.level = 0;
         }
         this.startTime = new Date().getTime();
         this.endTime = new Date().getTime();
@@ -57,26 +56,21 @@ export class Grid {
             this.lines.push(new Line(this, this.cells.slice(9 * i, 9 + 9 * i), i));
         }
         for (let i = 0; i < 9; i++) {
-            this.columns.push(new Column(this, [
-                this.lines[0].cells[i],
-                this.lines[1].cells[i],
-                this.lines[2].cells[i],
-                this.lines[3].cells[i],
-                this.lines[4].cells[i],
-                this.lines[5].cells[i],
-                this.lines[6].cells[i],
-                this.lines[7].cells[i],
-                this.lines[8].cells[i],
-            ], i));
-        }
-        for (let i = 0; i < 3; i++) {
-            for (let j = 0; j < 3; j++) {
-                this.squares.push(new Square(this, [
-                    ...this.lines[3 * i].cells.slice(3 * j, 3 + 3 * j),
-                    ...this.lines[1 + 3 * i].cells.slice(3 * j, 3 + 3 * j),
-                    ...this.lines[2 + 3 * i].cells.slice(3 * j, 3 + 3 * j),
-                ], i * 3 + j));
+            const columnCells: Cell[] = [];
+            for (let j = 0; j < 9; j++) {
+                columnCells.push(this.cells[i + 9 * j]);
             }
+            this.columns.push(new Column(this, columnCells, i));
+        }
+        for (let i = 0; i < 9; i++) {
+            const squareCells: Cell[] = [];
+            const multipleOfThree = Math.floor(i / 3);
+            const currentIndex = i * 3 + multipleOfThree * 18;
+            squareCells.push(...this.cells.slice(currentIndex, currentIndex + 3));
+            squareCells.push(...this.cells.slice(currentIndex + 9, currentIndex + 9 + 3));
+            squareCells.push(...this.cells.slice(currentIndex + 18, currentIndex + 18 + 3));
+
+            this.squares.push(new Square(this, squareCells, i));
         }
     }
 
