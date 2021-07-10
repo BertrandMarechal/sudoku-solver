@@ -1,6 +1,7 @@
 import { Cell } from "./cell.model";
 import { Grid } from "./grid.model";
 import { get } from 'config';
+import { levelToSpaces } from "./helpers";
 const verbose = get<boolean>('verbose');
 const cellChecksEntities = get<boolean>('cellChecksEntities');
 const useSubCollectionValueMaps = get<boolean>('useSubCollectionValueMaps');
@@ -43,10 +44,26 @@ export class GridSubCollection {
     }
 
     cellSet(cell: Cell) {
+        let valid = true;
         if (useSubCollectionValueMaps) {
-            this.foundValues[cell.value as number] = cell;
-            this._missingValues = this._missingValues.filter((value) => value !== cell.value);
-            this._freeCells = this._freeCells.filter(freeCell => freeCell !== cell);
+            if (!!this.foundValues[cell.value as number] &&
+                cell.column !== this.foundValues[cell.value as number]?.column &&
+                cell.line !== this.foundValues[cell.value as number]?.line
+            ) {
+                valid = false;
+            } else {
+                this.foundValues[cell.value as number] = cell;
+                this._missingValues = this._missingValues.filter((value) => value !== cell.value);
+                this._freeCells = this._freeCells.filter(freeCell => freeCell !== cell);
+            }
+        } else {
+            valid = this.checkIsValid();
+        }
+        if (!valid) {
+            if (verbose) {
+                console.log(levelToSpaces(this.grid) + 'Invalid solution');
+            }
+            throw new Error('Invalid solution');
         }
     }
 
@@ -117,17 +134,15 @@ export class GridSubCollection {
         }
     }
 
-    checkIsValid(): void {
+    checkIsValid(): boolean {
         for (const cell of this.cells) {
             if (cell.value) {
                 if (this.cells.filter(({ value }) => value === cell.value).length > 1) {
-                    if (verbose) {
-                        console.log('Invalid solution');
-                    }
-                    throw new Error('Invalid solution');
+                    return false;
                 }
             }
         }
+        return true;
     }
 
     settingCell(
@@ -138,7 +153,7 @@ export class GridSubCollection {
         let cells: Cell[] = [cell];
         cell.value = value;
         if (verbose) {
-            console.log(`Found value from ${origin} on ${this.entityType} for ${cell.line + 1} - ${cell.column + 1}: ${cell.value}`);
+            console.log(levelToSpaces(this.grid) + `Found value from ${origin} on ${this.entityType} for ${cell.line + 1} - ${cell.column + 1}: ${cell.value}`);
         }
         if (cellChecksEntities) {
             const otherCells = cell.checkEntities();

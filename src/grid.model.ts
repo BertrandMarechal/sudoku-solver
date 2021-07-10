@@ -2,6 +2,7 @@ import { Cell } from "./cell.model";
 import { Column, Line, oneToNine, Square } from "./sub-collections.model";
 import { get } from "config";
 import { verbose } from "../config/default";
+import { levelToSpaces } from "./helpers";
 const stopOnFirstSuccessfulSubGrid = get<boolean>('stopOnFirstSuccessfulSubGrid');
 
 export class Grid {
@@ -118,7 +119,6 @@ export class Grid {
         try {
             while (this.solveStepByStep().length) {
             }
-            this.checkIsValid();
             this.checkSolved();
         } catch {
             this.solved = false;
@@ -161,7 +161,6 @@ export class Grid {
 
     solveStepByStep(): Cell[] {
         this.checkIsKnown();
-        this.checkIsValid();
         this.checkSolved();
         let cells = this.solveIfOneMissing();
         if (cells.length > 0) {
@@ -315,7 +314,7 @@ export class Grid {
             this.known = this.root.subGrids.some(grid => grid !== this && regExp.test(grid.endRawText));
             if (this.known) {
                 if (verbose) {
-                    console.log('Grid vVariant is known');
+                    console.log(levelToSpaces(this) + 'Grid vVariant is known');
                 }
                 throw new Error('Grid vVariant is known');
             }
@@ -327,7 +326,8 @@ export class Grid {
         for (const cellToFill of cellsToFill) {
             cellToFill.potentialValues = [...oneToNine].filter(value =>
                 !this.lines[cellToFill.line].hasValue(value) &&
-                !this.columns[cellToFill.column].hasValue(value)
+                !this.columns[cellToFill.column].hasValue(value) &&
+                !cellToFill.squareEntity?.hasValue(value)
             );
         }
         cellsToFill.sort((a, b) => a.potentialValues.length - b.potentialValues.length);
@@ -338,6 +338,9 @@ export class Grid {
             }
         }
         for (const option of options) {
+            if (verbose) {
+                console.log(levelToSpaces(this) + '=> Trying new variation');
+            }
             const grid = new Grid(
                 this.toRawString(option),
                 this.root || this,

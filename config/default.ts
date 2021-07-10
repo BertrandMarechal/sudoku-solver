@@ -1,4 +1,4 @@
-export const verbose = false;
+export const verbose = true;
 export const cellChecksEntities = true;
 export const color = true;
 export const stopOnFirstSuccessfulSubGrid = false;
