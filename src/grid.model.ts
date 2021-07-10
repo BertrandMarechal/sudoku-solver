@@ -296,18 +296,6 @@ export class Grid {
         this.solved = !this.squares.some(({ solved }) => !solved);
     }
 
-    checkIsValid() {
-        for (let square of this.squares) {
-            square.checkIsValid();
-        }
-        for (let line of this.lines) {
-            line.checkIsValid();
-        }
-        for (let column of this.columns) {
-            column.checkIsValid();
-        }
-    }
-
     checkIsKnown() {
         if (this.root) {
             const regExp = this.toRawRegExp();

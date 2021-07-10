@@ -76,6 +76,9 @@ export class GridSubCollection {
     }
 
     hasValue(valueToCheck: number): boolean {
+        if (this.solved) {
+            return true;
+        }
         if (useSubCollectionValueMaps) {
             this.grid.incrementSteps();
             return !!this.foundValues[valueToCheck];
@@ -134,7 +137,7 @@ export class GridSubCollection {
         }
     }
 
-    checkIsValid(): boolean {
+    private checkIsValid(): boolean {
         for (const cell of this.cells) {
             if (cell.value) {
                 if (this.cells.filter(({ value }) => value === cell.value).length > 1) {
