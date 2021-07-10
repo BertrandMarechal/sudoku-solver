@@ -284,15 +284,6 @@ export class Grid {
     }
 
     checkSolved() {
-        for (let square of this.squares) {
-            square.checkSolved();
-        }
-        for (let line of this.lines) {
-            line.checkSolved();
-        }
-        for (let column of this.columns) {
-            column.checkSolved();
-        }
         this.solved = !this.squares.some(({ solved }) => !solved);
     }
 

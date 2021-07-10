@@ -55,9 +55,13 @@ export class GridSubCollection {
                 this.foundValues[cell.value as number] = cell;
                 this._missingValues = this._missingValues.filter((value) => value !== cell.value);
                 this._freeCells = this._freeCells.filter(freeCell => freeCell !== cell);
+                this.solved = this._freeCells.length === 0;
             }
         } else {
             valid = this.checkIsValid();
+            if (valid) {
+                this.solved = this.missingValues.length === 0;
+            }
         }
         if (!valid) {
             if (verbose) {
@@ -129,12 +133,6 @@ export class GridSubCollection {
             this.grid.incrementSteps();
             return value === v;
         }));
-    }
-
-    checkSolved(): void {
-        if (!this.solved) {
-            this.solved = this.freeCells.length === 0;
-        }
     }
 
     private checkIsValid(): boolean {

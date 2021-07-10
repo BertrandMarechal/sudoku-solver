@@ -1,7 +1,6 @@
 import { GridSubCollection } from './sub-collections.model';
 import { blue, cyan, gray, green, grey, magenta, red, white, yellow } from 'colors/safe';
 import { get } from 'config';
-import { Grid } from "./grid.model";
 
 const useSubCollectionValueMaps = get<boolean>('useSubCollectionValueMaps');
 const color = get<boolean>('color');
