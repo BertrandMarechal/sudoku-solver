@@ -121,6 +121,9 @@ export class GridSubCollection {
         for (const cell of this.cells) {
             if (cell.value) {
                 if (this.cells.filter(({ value }) => value === cell.value).length > 1) {
+                    if (verbose) {
+                        console.log('Invalid solution');
+                    }
                     throw new Error('Invalid solution');
                 }
             }
@@ -144,7 +147,7 @@ export class GridSubCollection {
         return cells;
     }
 
-    solveValuesBySimpleCross(grid: Grid): Cell[] {
+    solveValuesBySimpleCross(): Cell[] {
         if (this.solved) {
             return [];
         }
@@ -153,8 +156,8 @@ export class GridSubCollection {
             const availableCells: Cell[] = [];
             const freeCells = this.freeCells;
             for (const cell of freeCells) {
-                if (!grid.lines[cell.line].hasValue(v) &&
-                    !grid.columns[cell.column].hasValue(v)) {
+                if (!this.grid.lines[cell.line].hasValue(v) &&
+                    !this.grid.columns[cell.column].hasValue(v)) {
                     availableCells.push(cell);
                 }
             }
@@ -181,7 +184,7 @@ export class GridSubCollection {
         return [];
     }
 
-    solveByElimination(grid: Grid): Cell[] {
+    solveByElimination(): Cell[] {
         if (this.solved) {
             return [];
         }
@@ -189,8 +192,8 @@ export class GridSubCollection {
         const freeCells = this.freeCells;
         for (const freeCell of freeCells) {
             freeCell.potentialValues = missingValues.filter(value =>
-                !grid.lines[freeCell.line].hasValue(value) &&
-                !grid.columns[freeCell.column].hasValue(value)
+                !this.grid.lines[freeCell.line].hasValue(value) &&
+                !this.grid.columns[freeCell.column].hasValue(value)
             );
             if (freeCell.potentialValues.length === 1) {
                 return this.settingCell(freeCell, freeCell.potentialValues[0], "solveByElimination");
@@ -210,7 +213,7 @@ export class Square extends GridSubCollection {
         this.columns = [cells[0].column, cells[1].column, cells[2].column];
     }
 
-    solveValuesByComplexCross(grid: Grid): Cell[] {
+    solveValuesByComplexCross(): Cell[] {
         if (this.solved) {
             return [];
         }
@@ -219,8 +222,8 @@ export class Square extends GridSubCollection {
             const availableCells: Cell[] = [];
             const freeCells = this.freeCells;
             for (const cell of freeCells) {
-                if (!grid.lines[cell.line].hasValueNotOnSquare(v, this) &&
-                    !grid.columns[cell.column].hasValueNotOnSquare(v, this)) {
+                if (!this.grid.lines[cell.line].hasValueNotOnSquare(v, this) &&
+                    !this.grid.columns[cell.column].hasValueNotOnSquare(v, this)) {
                     availableCells.push(cell);
                 }
             }

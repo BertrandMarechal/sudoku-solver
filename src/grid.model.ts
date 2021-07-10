@@ -202,12 +202,12 @@ export class Grid {
         let cells: Cell[] = [];
         let i = 0;
         while (!cells.length && i < 9) {
-            cells = this.squares[i].solveValuesBySimpleCross(this);
+            cells = this.squares[i].solveValuesBySimpleCross();
             if (cells.length === 0) {
-                cells = this.lines[i].solveValuesBySimpleCross(this);
+                cells = this.lines[i].solveValuesBySimpleCross();
             }
             if (cells.length === 0) {
-                cells = this.columns[i].solveValuesBySimpleCross(this);
+                cells = this.columns[i].solveValuesBySimpleCross();
             }
             i++;
         }
@@ -218,12 +218,12 @@ export class Grid {
         let cells: Cell[] = [];
         let i = 0;
         while (!cells.length && i < 9) {
-            cells = this.squares[i].solveByElimination(this);
+            cells = this.squares[i].solveByElimination();
             if (cells.length === 0) {
-                this.lines[i].solveByElimination(this);
+                this.lines[i].solveByElimination();
             }
             if (cells.length === 0) {
-                this.columns[i].solveByElimination(this);
+                this.columns[i].solveByElimination();
             }
             i++;
         }
@@ -278,7 +278,7 @@ export class Grid {
         let cells: Cell[] = [];
         let i = 0;
         while (!cells.length && i < 9) {
-            cells = this.squares[i].solveValuesByComplexCross(this);
+            cells = this.squares[i].solveValuesByComplexCross();
             i++;
         }
         return cells;
