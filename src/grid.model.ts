@@ -1,6 +1,7 @@
 import { Cell } from "./cell.model";
 import { Column, Line, oneToNine, Square } from "./sub-collections.model";
 import { get } from "config";
+import { verbose } from "../config/default";
 const stopOnFirstSuccessfulSubGrid = get<boolean>('stopOnFirstSuccessfulSubGrid');
 
 export class Grid {
@@ -17,6 +18,8 @@ export class Grid {
     endTime: number;
     totalTime: number;
     stepCount: number;
+    level: number;
+    endRawText: string;
 
     constructor(grid: string, root: Grid | null = null, parent: Grid | null = null) {
         this.stepCount = 0;
@@ -33,18 +36,22 @@ export class Grid {
         if (this.root) {
             this.root.subGrids.push(this);
             if (parent) {
+                this.level = parent.level + 1;
                 this.stepCount = parent.stepCount;
             }
+        } else {
+            this.level = 0;
         }
         this.startTime = new Date().getTime();
         this.endTime = new Date().getTime();
         this.totalTime = new Date().getTime();
+        this.endRawText = "";
     }
 
     init(grid: string) {
         this.cells = grid
             .split("")
-            .map(n => n === " " ? null : +n)
+            .map(n => /^[1-9]$/.test(n) ? +n : null)
             .map((v, i) => new Cell(v, i));
         for (let i = 0; i < 9; i++) {
             this.lines.push(new Line(this, this.cells.slice(9 * i, 9 + 9 * i), i));
@@ -135,6 +142,7 @@ export class Grid {
             }
 
             if (!this.solved) {
+                this.endRawText = this.toRawString();
                 if (this.valid && this.testSubGrids()) {
                     this.solved = true;
                 }
@@ -310,8 +318,11 @@ export class Grid {
     checkIsKnown() {
         if (this.root) {
             const regExp = this.toRawRegExp();
-            this.known = this.root.subGrids.some(grid => grid !== this && regExp.test(grid.toRawString()));
+            this.known = this.root.subGrids.some(grid => grid !== this && regExp.test(grid.endRawText));
             if (this.known) {
+                if (verbose) {
+                    console.log('Grid vVariant is known');
+                }
                 throw new Error('Grid vVariant is known');
             }
         }
