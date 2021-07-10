@@ -49,30 +49,22 @@ export class Grid {
     }
 
     init(grid: string) {
+        for (let i = 0; i < 9; i++) {
+            this.lines.push(new Line(this, i));
+            this.columns.push(new Column(this, i));
+            this.squares.push(new Square(this, i));
+        }
         this.cells = grid
             .split("")
             .map(n => /^[1-9]$/.test(n) ? +n : null)
-            .map((v, i) => new Cell(v, i));
-        for (let i = 0; i < 9; i++) {
-            this.lines.push(new Line(this, this.cells.slice(9 * i, 9 + 9 * i), i));
-        }
-        for (let i = 0; i < 9; i++) {
-            const columnCells: Cell[] = [];
-            for (let j = 0; j < 9; j++) {
-                columnCells.push(this.cells[i + 9 * j]);
-            }
-            this.columns.push(new Column(this, columnCells, i));
-        }
-        for (let i = 0; i < 9; i++) {
-            const squareCells: Cell[] = [];
-            const multipleOfThree = Math.floor(i / 3);
-            const currentIndex = i * 3 + multipleOfThree * 18;
-            squareCells.push(...this.cells.slice(currentIndex, currentIndex + 3));
-            squareCells.push(...this.cells.slice(currentIndex + 9, currentIndex + 9 + 3));
-            squareCells.push(...this.cells.slice(currentIndex + 18, currentIndex + 18 + 3));
-
-            this.squares.push(new Square(this, squareCells, i));
-        }
+            .map((v, i) => new Cell(v, i, {
+                line: this.lines[Math.floor(i / 9)],
+                column: this.columns[Math.floor(i % 9)],
+                square: this.squares.find(square =>square.hasCell({
+                    line: Math.floor(i / 9),
+                    column: Math.floor(i % 9)
+                })) as Square,
+            }));
     }
 
     toString() {
@@ -81,13 +73,7 @@ export class Grid {
             if (i % 3 === 0) {
                 grid += '-'.repeat(31) + '\n';
             }
-            for (let j = 0; j < 9; j++) {
-                if (j % 3 === 0) {
-                    grid += '|';
-                }
-                grid += this.lines[i].cells[j].toString();
-            }
-            grid += '|\n';
+            grid += this.lines[i].toString();
         }
         grid += '-'.repeat(31) + '\n';
         return grid;

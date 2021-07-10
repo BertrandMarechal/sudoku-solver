@@ -11,7 +11,7 @@ export const oneToNine = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 type EntityType = "unset" | "square" | "line" | "column";
 
 export class GridSubCollection {
-    cells: Cell[];
+    protected _cells: Cell[];
     solved: boolean;
     grid: Grid;
     entityType: EntityType;
@@ -21,10 +21,10 @@ export class GridSubCollection {
     private _missingValues: number[];
     private _freeCells: Cell[];
 
-    constructor(grid: Grid, cells: Cell[], index: number, entityType: EntityType = "unset") {
+    constructor(grid: Grid, index: number, entityType: EntityType = "unset") {
         this.grid = grid;
         this.entityType = entityType;
-        this.cells = cells;
+        this._cells = [];
         this.index = index;
         this.solved = false;
         this.lockedOnPositions = {};
@@ -33,7 +33,17 @@ export class GridSubCollection {
             ...agg, [curr]: null
         }), {});
         this._freeCells = [];
-        for (const cell of cells) {
+    }
+
+    addCell(cell: Cell) {
+        this._cells.push(cell);
+        if (this._cells.length === 9) {
+            this.processCells();
+        }
+    }
+
+    protected processCells() {
+        for (const cell of this._cells) {
             cell.setEntity(this);
             if (cell.value) {
                 this.cellSet(cell);
@@ -87,7 +97,7 @@ export class GridSubCollection {
             this.grid.incrementSteps();
             return !!this.foundValues[valueToCheck];
         }
-        return this.cells.some(({ value }) => {
+        return this._cells.some(({ value }) => {
             this.grid.incrementSteps();
             return valueToCheck === value;
         });
@@ -119,7 +129,7 @@ export class GridSubCollection {
         if (useSubCollectionValueMaps) {
             return this._freeCells;
         }
-        return this.cells.filter(({ value }) => {
+        return this._cells.filter(({ value }) => {
             this.grid.incrementSteps();
             return !value;
         });
@@ -129,16 +139,16 @@ export class GridSubCollection {
         if (useSubCollectionValueMaps) {
             return this._missingValues;
         }
-        return [...oneToNine].filter(v => !this.cells.some(({ value }) => {
+        return [...oneToNine].filter(v => !this._cells.some(({ value }) => {
             this.grid.incrementSteps();
             return value === v;
         }));
     }
 
     private checkIsValid(): boolean {
-        for (const cell of this.cells) {
+        for (const cell of this._cells) {
             if (cell.value) {
-                if (this.cells.filter(({ value }) => value === cell.value).length > 1) {
+                if (this._cells.filter(({ value }) => value === cell.value).length > 1) {
                     return false;
                 }
             }
@@ -146,7 +156,7 @@ export class GridSubCollection {
         return true;
     }
 
-    settingCell(
+    protected settingCell(
         cell: Cell,
         value: number,
         origin: "solveValuesBySimpleCross" | "solveIfOneMissing" | "solveByElimination" | "solveValuesByComplexCross"
@@ -191,7 +201,7 @@ export class GridSubCollection {
         }
         const missingValues = this.missingValues;
         if (missingValues.length === 1) {
-            const cell = this.cells.find(({ value }) => {
+            const cell = this._cells.find(({ value }) => {
                 this.grid.incrementSteps();
                 return !value;
             }) as Cell;
@@ -223,10 +233,18 @@ export class Square extends GridSubCollection {
     lines: number[];
     columns: number[];
 
-    constructor(grid: Grid, cells: Cell[], index: number) {
-        super(grid, cells, index, "square");
-        this.lines = [cells[0].line, cells[3].line, cells[6].line];
-        this.columns = [cells[0].column, cells[1].column, cells[2].column];
+    constructor(grid: Grid, index: number) {
+        super(grid, index, "square");
+        const verticalBlock = Math.floor(index / 3);
+        const horizontalBlock = index % 3;
+        this.lines = [];
+        this.columns = [];
+        for (let i = 0; i <3; i++) {
+            this.lines.push(i + 3 * verticalBlock);
+        }
+        for (let i = 0; i <3; i++) {
+            this.columns.push(i + 3 * horizontalBlock);
+        }
     }
 
     solveValuesByComplexCross(): Cell[] {
@@ -250,17 +268,32 @@ export class Square extends GridSubCollection {
         }
         return [];
     }
+
+    hasCell({ line, column }: { line: number; column: number }) {
+        return this.lines.some(l => l === line) && this.columns.some(c => c === column);
+    }
 }
 
 export class Line extends GridSubCollection {
-    constructor(grid: Grid, cells: Cell[], index: number) {
-        super(grid, cells, index, "line");
+    constructor(grid: Grid, index: number) {
+        super(grid, index, "line");
+    }
+
+    toString(): string {
+        let line: string = '';
+        for (let i = 0; i < 9; i++) {
+            if (i % 3 === 0) {
+                line += '|';
+            }
+            line += this._cells[i].toString();
+        }
+        return line + '|\n';
     }
 }
 
 export class Column extends GridSubCollection {
-    constructor(grid: Grid, cells: Cell[], index: number) {
-        super(grid, cells, index, "column");
+    constructor(grid: Grid, index: number) {
+        super(grid,  index, "column");
     }
 }
 

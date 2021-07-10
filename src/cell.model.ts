@@ -1,4 +1,4 @@
-import { GridSubCollection } from './sub-collections.model';
+import { Column, GridSubCollection, Line, Square } from './sub-collections.model';
 import { blue, cyan, gray, green, grey, magenta, red, white, yellow } from 'colors/safe';
 import { get } from 'config';
 
@@ -9,30 +9,43 @@ export class Cell {
     set value(value: number | null) {
         this._value = value;
         if (useSubCollectionValueMaps) {
-            this.columnEntity?.cellSet(this);
-            this.lineEntity?.cellSet(this);
-            this.squareEntity?.cellSet(this);
+            this.columnEntity.cellSet(this);
+            this.lineEntity.cellSet(this);
+            this.squareEntity.cellSet(this);
         }
     }
+
     get value(): number | null {
         return this._value;
     }
+
     column: number;
     line: number;
     private _value: number | null;
     potentialValues: number[];
-    lineEntity: GridSubCollection | null;
-    columnEntity: GridSubCollection | null;
-    squareEntity: GridSubCollection | null;
+    lineEntity: GridSubCollection;
+    columnEntity: GridSubCollection;
+    squareEntity: GridSubCollection;
 
-    constructor(value: number | null, index: number) {
+    constructor(
+        value: number | null,
+        index: number,
+        { line, column, square }: {
+            line: Line;
+            column: Column;
+            square: Square;
+        }
+    ) {
         this._value = value;
         this.column = index % 9;
         this.line = Math.floor(index / 9);
         this.potentialValues = [];
-        this.lineEntity = null;
-        this.columnEntity = null;
-        this.squareEntity = null;
+        this.lineEntity = line;
+        this.columnEntity = column;
+        this.squareEntity = square;
+        this.lineEntity.addCell(this);
+        this.columnEntity.addCell(this);
+        this.squareEntity.addCell(this);
     }
 
     setEntity(entity: GridSubCollection) {
@@ -51,12 +64,12 @@ export class Cell {
 
     checkEntities(): Cell[] {
         return [
-            ...this.columnEntity?.solveIfOneMissing() || [],
-            ...this.columnEntity?.solveValuesBySimpleCross() || [],
-            ...this.lineEntity?.solveIfOneMissing() || [],
-            ...this.lineEntity?.solveValuesBySimpleCross() || [],
-            ...this.squareEntity?.solveIfOneMissing() || [],
-            ...this.squareEntity?.solveValuesBySimpleCross() || [],
+            ...this.columnEntity.solveIfOneMissing() || [],
+            ...this.columnEntity.solveValuesBySimpleCross() || [],
+            ...this.lineEntity.solveIfOneMissing() || [],
+            ...this.lineEntity.solveValuesBySimpleCross() || [],
+            ...this.squareEntity.solveIfOneMissing() || [],
+            ...this.squareEntity.solveValuesBySimpleCross() || [],
         ];
     }
 
