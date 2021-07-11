@@ -3,6 +3,9 @@ import { Column, Line, oneToNine, Square } from "./sub-collections.model";
 import { get } from "config";
 import { verbose } from "../config/default";
 import { levelToSpaces } from "./helpers";
+import { ifError } from "assert";
+import { red } from "colors/safe";
+
 const stopOnFirstSuccessfulSubGrid = get<boolean>('stopOnFirstSuccessfulSubGrid');
 
 export class Grid {
@@ -60,7 +63,7 @@ export class Grid {
             .map((v, i) => new Cell(v, i, {
                 line: this.lines[Math.floor(i / 9)],
                 column: this.columns[Math.floor(i % 9)],
-                square: this.squares.find(square =>square.hasCell({
+                square: this.squares.find(square => square.hasCell({
                     line: Math.floor(i / 9),
                     column: Math.floor(i % 9)
                 })) as Square,
@@ -88,14 +91,14 @@ export class Grid {
             ) {
                 return params.value;
             }
-            return currentCell.value || ' ';
+            return currentCell.toRawString();
         }).join('');
     }
 
     toRawRegExp() {
-        return new RegExp(this.cells.map((currentCell) => {
-            return currentCell.value || '.';
-        }).join(''));
+        return new RegExp(this.cells.map((currentCell) =>
+            currentCell.toRawString('.')
+        ).join(''));
     }
 
     solve() {
@@ -106,7 +109,7 @@ export class Grid {
             while (this.solveStepByStep().length) {
             }
             this.checkSolved();
-        } catch {
+        } catch (e) {
             this.solved = false;
             this.valid = false;
         } finally {
@@ -129,7 +132,7 @@ export class Grid {
                 if (!this.root) {
                     if (this.subGrids.length) {
                         const analysedSubGrids = this.subGrids;
-                        const validSubGrids = this.subGrids.filter(({ solved }) => solved);
+                        const validSubGrids = this.subGrids.filter(({ solved, known }) => solved && !known);
                         if (validSubGrids.length) {
                             console.log(validSubGrids[validSubGrids.length - 1].toString());
                             console.log(`Total steps: ${validSubGrids[validSubGrids.length - 1].stepCount}`);
@@ -168,7 +171,7 @@ export class Grid {
     }
 
     solveIfOneMissing(): Cell[] {
-        let cells: Cell[] = [];
+        let cells: Cell[] = this.solveIfOneValueMissing();
         let i = 0;
         while (!cells.length && i < 9) {
             cells = this.squares[i].solveIfOneMissing();
@@ -179,6 +182,29 @@ export class Grid {
                 cells = this.columns[i].solveIfOneMissing();
             }
             i++;
+        }
+        return cells;
+    }
+
+    solveIfOneValueMissing(): Cell[] {
+        let cells: Cell[] = [];
+        for (let v = 1; v < 10; v++) {
+            const [lines, columns] = this.cells.reduce((
+                [lines, columns]: [number[], number[]],
+                { value, line, column }) => {
+                this.incrementSteps();
+                if (value === v) {
+                    return [
+                        lines.filter(l => l !== line),
+                        columns.filter(l => l !== column),
+                    ];
+                }
+                return [lines, columns];
+            }, [oneToNine.map(i => i - 1), oneToNine.map(i => i - 1)]);
+            if (lines.length === 1 && columns.length === 1) {
+                const [line, column] = [lines[0], columns[0]];
+                return this.cells[line * 9 + column].setValue(v, 'solveIfOneMissing', 'value', this.level);
+            }
         }
         return cells;
     }
@@ -290,9 +316,9 @@ export class Grid {
         const cellsToFill = this.cells.filter(({ value }) => !value);
         for (const cellToFill of cellsToFill) {
             cellToFill.potentialValues = [...oneToNine].filter(value =>
-                !this.lines[cellToFill.line].hasValue(value) &&
-                !this.columns[cellToFill.column].hasValue(value) &&
-                !cellToFill.squareEntity?.hasValue(value)
+                !cellToFill.lineEntity.hasValue(value) &&
+                !cellToFill.columnEntity.hasValue(value) &&
+                !cellToFill.squareEntity.hasValue(value)
             );
         }
         cellsToFill.sort((a, b) => a.potentialValues.length - b.potentialValues.length);

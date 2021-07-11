@@ -1,20 +1,14 @@
-import { Column, GridSubCollection, Line, Square } from './sub-collections.model';
+import { Column, EntityType, GridSubCollection, Line, Square } from './sub-collections.model';
 import { blue, cyan, gray, green, grey, magenta, red, white, yellow } from 'colors/safe';
 import { get } from 'config';
+import { levelToSpaces } from "./helpers";
 
+const verbose = get<boolean>('verbose');
+const cellChecksEntities = get<boolean>('cellChecksEntities');
 const useSubCollectionValueMaps = get<boolean>('useSubCollectionValueMaps');
 const color = get<boolean>('color');
 
 export class Cell {
-    set value(value: number | null) {
-        this._value = value;
-        if (useSubCollectionValueMaps) {
-            this.columnEntity.cellSet(this);
-            this.lineEntity.cellSet(this);
-            this.squareEntity.cellSet(this);
-        }
-    }
-
     get value(): number | null {
         return this._value;
     }
@@ -62,7 +56,32 @@ export class Cell {
         }
     }
 
-    checkEntities(): Cell[] {
+    setValue(
+        value: number | null,
+        origin: "solveValuesBySimpleCross" |
+            "solveIfOneMissing" |
+            "solveByElimination" |
+            "solveValuesByComplexCross",
+        entityType: EntityType,
+        level: number
+    ) {
+        this._value = value;
+        if (verbose) {
+            console.log(levelToSpaces({ level }) + `Found value from ${origin} on ${entityType} for ${this.line + 1} - ${this.column + 1}: ${value}`);
+        }
+        if (useSubCollectionValueMaps) {
+            this.columnEntity.cellSet(this);
+            this.lineEntity.cellSet(this);
+            this.squareEntity.cellSet(this);
+        }
+        let cells: Cell[] = [this];
+        if (cellChecksEntities) {
+            cells.push(...this.solveRelatedToThisOne());
+        }
+        return cells;
+    }
+
+    solveRelatedToThisOne(): Cell[] {
         return [
             ...this.columnEntity.solveIfOneMissing() || [],
             ...this.columnEntity.solveValuesBySimpleCross() || [],
@@ -73,36 +92,40 @@ export class Cell {
         ];
     }
 
+    toRawString(textIfEmpty: string = ' '): string {
+        return `${this._value || textIfEmpty}`;
+    }
+
     toString() {
         return ` ${this.coloredValue} `;
     }
 
     get coloredValue() {
-        if (!this.value) {
+        if (!this._value) {
             return '_';
         }
         if (!color) {
-            return this.value;
+            return this._value;
         }
-        switch (this.value) {
+        switch (this._value) {
             case 1:
-                return red(`${this.value}`);
+                return red(`${this._value}`);
             case 2:
-                return green(`${this.value}`);
+                return green(`${this._value}`);
             case 3:
-                return yellow(`${this.value}`);
+                return yellow(`${this._value}`);
             case 4:
-                return blue(`${this.value}`);
+                return blue(`${this._value}`);
             case 5:
-                return magenta(`${this.value}`);
+                return magenta(`${this._value}`);
             case 6:
-                return cyan(`${this.value}`);
+                return cyan(`${this._value}`);
             case 7:
-                return white(`${this.value}`);
+                return white(`${this._value}`);
             case 8:
-                return gray(`${this.value}`);
+                return gray(`${this._value}`);
             case 9:
-                return grey(`${this.value}`);
+                return grey(`${this._value}`);
         }
     }
 }
