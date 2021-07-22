@@ -1,32 +1,28 @@
 import { Cell } from "./cell.model";
-import { Column, Line, oneToNine, Square } from "./sub-collections.model";
+import { Column, Line, Square } from "./sub-collections.model";
 import { get } from "config";
-import { verbose } from "../config/default";
-import { levelToSpaces } from "./helpers";
-import { ifError } from "assert";
-import { red } from "colors/safe";
 
 const stopOnFirstSuccessfulSubGrid = get<boolean>('stopOnFirstSuccessfulSubGrid');
 
 export class Grid {
-    root: Grid | null;
+    parent: Grid | null;
     subGrids: Grid[];
     cells: Cell[];
     squares: Square[];
     columns: Column[];
     lines: Line[];
-    solved: Boolean;
-    valid: Boolean;
-    known: Boolean;
+    solved: boolean;
+    valid: boolean;
+    known: boolean;
     startTime: number;
     endTime: number;
     totalTime: number;
-    stepCount: number;
     level: number;
+    index: number;
+    path: string;
     endRawText: string;
 
-    constructor(grid: string, root: Grid | null = null, parent: Grid | null = null) {
-        this.stepCount = 0;
+    constructor(grid: string, index: number, parent: Grid | null = null) {
         this.subGrids = [];
         this.cells = [];
         this.squares = [];
@@ -36,14 +32,14 @@ export class Grid {
         this.valid = true;
         this.known = false;
         this.init(grid);
-        this.root = root;
+        this.parent = parent;
         this.level = 0;
-        if (this.root) {
-            this.root.subGrids.push(this);
-            if (parent) {
-                this.level = parent.level + 1;
-                this.stepCount = parent.stepCount;
-            }
+        this.index = index;
+        if (parent) {
+            this.path = `${parent.path}|${index}`;
+            this.level = parent.level + 1;
+        } else {
+            this.path = `${index}`;
         }
         this.startTime = new Date().getTime();
         this.endTime = new Date().getTime();
@@ -53,9 +49,9 @@ export class Grid {
 
     init(grid: string) {
         for (let i = 0; i < 9; i++) {
-            this.lines.push(new Line(this, i));
-            this.columns.push(new Column(this, i));
-            this.squares.push(new Square(this, i));
+            this.lines.push(new Line(i));
+            this.columns.push(new Column(i));
+            this.squares.push(new Square(i));
         }
         this.cells = grid
             .split("")
@@ -68,6 +64,10 @@ export class Grid {
                     column: Math.floor(i % 9)
                 })) as Square,
             }));
+    }
+
+    print() {
+        console.log(this.toString());
     }
 
     toString() {
@@ -95,263 +95,30 @@ export class Grid {
         }).join('');
     }
 
-    toRawRegExp() {
-        return new RegExp(this.cells.map((currentCell) =>
+    toRawRegExpString() {
+        return this.cells.map((currentCell) =>
             currentCell.toRawString('.')
-        ).join(''));
-    }
-
-    solve() {
-        if (!this.root) {
-            console.log(this.toString());
-        }
-        try {
-            while (this.solveStepByStep().length) {
-            }
-            this.checkSolved();
-        } catch (e) {
-            this.solved = false;
-            this.valid = false;
-        } finally {
-            this.endTime = new Date().getTime();
-            this.totalTime = this.endTime - this.startTime;
-
-            if (this.solved && !this.root) {
-                console.log(this.toString());
-                console.log(`Solved: ${this.solved}`);
-                this.startTime = new Date().getTime();
-                console.log(`Total time: ${this.totalTime} ms`);
-                console.log(`Total steps: ${this.stepCount}`);
-            }
-
-            if (!this.solved) {
-                this.endRawText = this.toRawString();
-                if (this.valid && this.testSubGrids()) {
-                    this.solved = true;
-                }
-                if (!this.root) {
-                    if (this.subGrids.length) {
-                        const analysedSubGrids = this.subGrids;
-                        const validSubGrids = this.subGrids.filter(({ solved, known }) => solved && !known);
-                        if (validSubGrids.length) {
-                            console.log(validSubGrids[validSubGrids.length - 1].toString());
-                            console.log(`Total steps: ${validSubGrids[validSubGrids.length - 1].stepCount}`);
-                        }
-                        console.log(`Total time: ${this.subGrids[this.subGrids.length - 1].endTime - this.startTime} ms`);
-
-                        console.log(`${analysedSubGrids.length} variation${analysedSubGrids.length === 1 ? '' : 's'} analysed`);
-                        console.log(`${validSubGrids.length} variation${validSubGrids.length === 1 ? '' : 's'} solved`);
-                    }
-                    console.log(`Solved: ${this.solved}`);
-                }
-            }
-        }
-    }
-
-    solveStepByStep(): Cell[] {
-        this.checkIsKnown();
-        this.checkSolved();
-        let cells = this.solveIfOneMissing();
-        if (cells.length > 0) {
-            return cells;
-        }
-        cells = this.solveValuesBySimpleCross();
-        if (cells.length > 0) {
-            return cells;
-        }
-        if (cells.length > 0) {
-            return cells;
-        }
-        cells = this.solveByElimination();
-        if (cells.length > 0) {
-            return cells;
-        }
-        cells = this.solveFromCloseBy();
-        return cells;
-    }
-
-    solveIfOneMissing(): Cell[] {
-        let cells: Cell[] = this.solveIfOneValueMissing();
-        let i = 0;
-        while (!cells.length && i < 9) {
-            cells = this.squares[i].solveIfOneMissing();
-            if (cells.length === 0) {
-                cells = this.lines[i].solveIfOneMissing();
-            }
-            if (cells.length === 0) {
-                cells = this.columns[i].solveIfOneMissing();
-            }
-            i++;
-        }
-        return cells;
-    }
-
-    solveIfOneValueMissing(): Cell[] {
-        let cells: Cell[] = [];
-        for (let v = 1; v < 10; v++) {
-            const [lines, columns] = this.cells.reduce((
-                [lines, columns]: [number[], number[]],
-                { value, line, column }) => {
-                this.incrementSteps();
-                if (value === v) {
-                    return [
-                        lines.filter(l => l !== line),
-                        columns.filter(l => l !== column),
-                    ];
-                }
-                return [lines, columns];
-            }, [oneToNine.map(i => i - 1), oneToNine.map(i => i - 1)]);
-            if (lines.length === 1 && columns.length === 1) {
-                const [line, column] = [lines[0], columns[0]];
-                return this.cells[line * 9 + column].setValue(v, 'solveIfOneMissing', 'value', this.level);
-            }
-        }
-        return cells;
-    }
-
-    solveValuesBySimpleCross(): Cell[] {
-        let cells: Cell[] = [];
-        let i = 0;
-        while (!cells.length && i < 9) {
-            cells = this.squares[i].solveValuesBySimpleCross();
-            if (cells.length === 0) {
-                cells = this.lines[i].solveValuesBySimpleCross();
-            }
-            if (cells.length === 0) {
-                cells = this.columns[i].solveValuesBySimpleCross();
-            }
-            i++;
-        }
-        return cells;
-    }
-
-    solveByElimination(): Cell[] {
-        let cells: Cell[] = [];
-        let i = 0;
-        while (!cells.length && i < 9) {
-            cells = this.squares[i].solveByElimination();
-            if (cells.length === 0) {
-                this.lines[i].solveByElimination();
-            }
-            if (cells.length === 0) {
-                this.columns[i].solveByElimination();
-            }
-            i++;
-        }
-        return cells;
-    }
-
-    solveFromCloseBy(): Cell[] {
-        for (const line of this.lines) {
-            line.resetLockedOnPositions();
-        }
-        for (const column of this.columns) {
-            column.resetLockedOnPositions();
-        }
-        // get the state
-        for (const square of this.squares) {
-            const freeCells = square.freeCells;
-            const missingValues = square.missingValues;
-            for (let freeCell of freeCells) {
-                freeCell.potentialValues = missingValues.filter(value =>
-                    !this.lines[freeCell.line].hasValue(value) &&
-                    !this.columns[freeCell.column].hasValue(value)
-                );
-            }
-            for (const missingValue of missingValues) {
-                const cellsOfValue = freeCells.filter(cell => {
-                    return cell.potentialValues.some(value => {
-                        this.incrementSteps();
-                        return value === missingValue;
-                    });
-                });
-                const lines = cellsOfValue.reduce((agg: number[], { line }) => {
-                    if (!agg.some(value => value === line)) {
-                        agg.push(line);
-                    }
-                    return agg;
-                }, []);
-                const columns = cellsOfValue.reduce((agg: number[], { column }) => {
-                    if (!agg.some(value => value === column)) {
-                        agg.push(column);
-                    }
-                    return agg;
-                }, []);
-                if (lines.length === 1) {
-                    this.lines[lines[0]].lockValueToCells(missingValue, cellsOfValue);
-                }
-                if (columns.length === 1) {
-                    this.columns[columns[0]].lockValueToCells(missingValue, cellsOfValue);
-                }
-            }
-        }
-
-        let cells: Cell[] = [];
-        let i = 0;
-        while (!cells.length && i < 9) {
-            cells = this.squares[i].solveValuesByComplexCross();
-            i++;
-        }
-        return cells;
+        ).join('');
     }
 
     checkSolved() {
-        this.solved = !this.squares.some(({ solved }) => !solved);
+        this.solved =
+            this.squares.every(({ solved }) => solved) &&
+            this.lines.every(({ solved }) => solved) &&
+            this.columns.every(({ solved }) => solved);
     }
 
-    checkIsKnown() {
-        if (this.root) {
-            const regExp = this.toRawRegExp();
-            this.known = this.root.subGrids.some(grid => grid !== this && regExp.test(grid.endRawText));
-            if (this.known) {
-                if (verbose) {
-                    console.log(levelToSpaces(this) + 'Grid vVariant is known');
-                }
-                throw new Error('Grid vVariant is known');
-            }
-        }
+    checkValid() {
+        this.valid =
+            this.squares.every(({ valid }) => valid) &&
+            this.lines.every(({ valid }) => valid) &&
+            this.columns.every(({ valid }) => valid);
     }
 
-    testSubGrids(): boolean {
-        const cellsToFill = this.cells.filter(({ value }) => !value);
-        for (const cellToFill of cellsToFill) {
-            cellToFill.potentialValues = [...oneToNine].filter(value =>
-                !cellToFill.lineEntity.hasValue(value) &&
-                !cellToFill.columnEntity.hasValue(value) &&
-                !cellToFill.squareEntity.hasValue(value)
-            );
-        }
-        cellsToFill.sort((a, b) => a.potentialValues.length - b.potentialValues.length);
-        const options: { cell: Cell, value: number }[] = [];
-        for (let cell of cellsToFill) {
-            for (const value of cell.potentialValues) {
-                options.push({ cell, value });
-            }
-        }
-        for (const option of options) {
-            if (verbose) {
-                console.log(levelToSpaces(this) + '=> Trying new variation');
-            }
-            const grid = new Grid(
-                this.toRawString(option),
-                this.root || this,
-                this
-            );
-            grid.solve();
-            if (grid.solved && stopOnFirstSuccessfulSubGrid) {
-                return true;
-            }
-        }
-        if (!this.root) {
-            if (this.subGrids.some(({ solved }) => solved)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    incrementSteps(count?: number) {
-        this.stepCount += count || 1;
+    getCellsToFill(): { line: number, column: number, value: number }[] {
+        return this.cells
+            .filter(({initiallySet}) => !initiallySet)
+            .map(({line, column, value}) => ({line, column, value: value || 0}));
     }
 }
 

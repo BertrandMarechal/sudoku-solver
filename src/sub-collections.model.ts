@@ -1,11 +1,7 @@
 import { Cell } from "./cell.model";
-import { Grid } from "./grid.model";
 import { get } from 'config';
-import { levelToSpaces } from "./helpers";
-import { red } from "colors/safe";
 
 const verbose = get<boolean>('verbose');
-const useSubCollectionValueMaps = get<boolean>('useSubCollectionValueMaps');
 
 export const oneToNine = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
@@ -14,7 +10,7 @@ export type EntityType = "unset" | "square" | "line" | "column" | "value";
 export class GridSubCollection {
     protected _cells: Cell[];
     solved: boolean;
-    grid: Grid;
+    valid: boolean;
     entityType: EntityType;
     index: number;
     lockedOnPositions: Record<number, Cell[]>;
@@ -22,12 +18,16 @@ export class GridSubCollection {
     private _missingValues: number[];
     private _freeCells: Cell[];
 
-    constructor(grid: Grid, index: number, entityType: EntityType = "unset") {
-        this.grid = grid;
+    get cells(): Cell[] {
+        return this._cells;
+    }
+
+    constructor(index: number, entityType: EntityType = "unset") {
         this.entityType = entityType;
         this._cells = [];
         this.index = index;
         this.solved = false;
+        this.valid = true;
         this.lockedOnPositions = {};
         this._missingValues = [...oneToNine];
         this.foundValues = [...oneToNine].reduce((agg, curr) => ({
@@ -56,32 +56,28 @@ export class GridSubCollection {
     }
 
     cellSet(cell: Cell) {
-        let valid = true;
-        if (useSubCollectionValueMaps) {
-            if (!!this.foundValues[cell.value as number] &&
+        const value = cell.value;
+        if (value) {
+            const alreadyFound =this.foundValues[value];
+            if (!!alreadyFound &&
                 (
-                    cell.column !== this.foundValues[cell.value as number]?.column ||
-                    cell.line !== this.foundValues[cell.value as number]?.line
+                    cell.column !== alreadyFound?.column ||
+                    cell.line !== alreadyFound?.line
                 )
             ) {
-                valid = false;
+                this.valid = false;
             } else {
-                this.foundValues[cell.value as number] = cell;
-                this._missingValues = this._missingValues.filter((value) => value !== cell.value);
+                this.foundValues[value] = cell;
+                this._missingValues = this._missingValues.filter((v) => v !== value);
                 this._freeCells = this._freeCells.filter(freeCell => freeCell !== cell);
                 this.solved = this._freeCells.length === 0;
             }
-        } else {
-            valid = this.checkIsValid();
-            if (valid) {
-                this.solved = this.missingValues.length === 0;
+            if (!this.valid) {
+                if (verbose) {
+                    console.log(`Invalid solution for ${this.entityType} ${this.index + 1}. Was setting ${cell.line + 1} - ${cell.column + 1} to ${cell.value}`);
+                }
+                throw new Error('Invalid solution');
             }
-        }
-        if (!valid) {
-            if (verbose) {
-                console.log(levelToSpaces(this.grid) + `Invalid solution for ${this.entityType} ${this.index + 1}`);
-            }
-            throw new Error('Invalid solution');
         }
     }
 
@@ -97,14 +93,7 @@ export class GridSubCollection {
         if (this.solved) {
             return true;
         }
-        if (useSubCollectionValueMaps) {
-            this.grid.incrementSteps();
-            return !!this.foundValues[valueToCheck];
-        }
-        return this._cells.some(({ value }) => {
-            this.grid.incrementSteps();
-            return valueToCheck === value;
-        });
+        return !!this.foundValues[valueToCheck];
     }
 
     hasValueNotOnSquare(valueToCheck: number, square: Square): boolean {
@@ -115,13 +104,11 @@ export class GridSubCollection {
         if (this.lockedOnPositions[valueToCheck]) {
             if (this.entityType === "line") {
                 return this.lockedOnPositions[valueToCheck].some(cell => {
-                    this.grid.incrementSteps();
                     return !square.columns.some(e => e === cell.column);
                 });
             } else if (this.entityType === "column") {
                 return this.lockedOnPositions[valueToCheck].some(cell => {
 
-                    this.grid.incrementSteps();
                     return !square.lines.some(e => e === cell.line);
                 });
             }
@@ -130,119 +117,11 @@ export class GridSubCollection {
     }
 
     get freeCells(): Cell[] {
-        if (useSubCollectionValueMaps) {
-            return this._freeCells;
-        }
-        return this._cells.filter(({ value }) => {
-            this.grid.incrementSteps();
-            return !value;
-        });
+        return this._freeCells;
     }
 
     get missingValues(): number[] {
-        if (useSubCollectionValueMaps) {
-            return this._missingValues;
-        }
-        return [...oneToNine].filter(v => !this._cells.some(({ value }) => {
-            this.grid.incrementSteps();
-            return value === v;
-        }));
-    }
-
-    private checkIsValid(): boolean {
-        for (const cell of this._cells) {
-            if (cell.value) {
-                if (this._cells.filter(({ value }) => value === cell.value).length > 1) {
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
-
-    protected settingCell(
-        cell: Cell,
-        value: number,
-        origin: "solveValuesBySimpleCross" | "solveIfOneMissing" | "solveByElimination" | "solveValuesByComplexCross"
-    ): Cell[] {
-        return cell.setValue(value, origin, this.entityType, this.grid.level);
-    }
-
-    solveValuesBySimpleCross(): Cell[] {
-        if (this.solved) {
-            return [];
-        }
-        const missingValues = this.missingValues;
-        for (const v of missingValues) {
-            const availableCells: Cell[] = [];
-            const freeCells = this.freeCells;
-            for (const cell of freeCells) {
-                let isAvailable = false;
-                switch (this.entityType) {
-                    case "square":
-                        isAvailable = !cell.lineEntity.hasValue(v) &&
-                            !cell.columnEntity.hasValue(v);
-                        break;
-                    case "column":
-                        isAvailable = !cell.squareEntity.hasValue(v) &&
-                            !cell.columnEntity.hasValue(v);
-                        break;
-                    case "line":
-                        isAvailable = !cell.squareEntity.hasValue(v) &&
-                            !cell.lineEntity.hasValue(v);
-                        break;
-                }
-                if (isAvailable) {
-                    availableCells.push(cell);
-                }
-            }
-            if (availableCells.length === 1) {
-                return this.settingCell(availableCells[0], v, "solveValuesBySimpleCross");
-            }
-        }
-        return [];
-    }
-
-    solveIfOneMissing(): Cell[] {
-        if (this.solved) {
-            return [];
-        }
-        const missingValues = this.missingValues;
-        if (missingValues.length === 1) {
-            const cell = this._cells.find(({ value }) => {
-                this.grid.incrementSteps();
-                return !value;
-            }) as Cell;
-            return this.settingCell(cell, missingValues[0], "solveIfOneMissing");
-        }
-        return [];
-    }
-
-    solveByElimination(): Cell[] {
-        if (this.solved) {
-            return [];
-        }
-        const missingValues = this.missingValues;
-        const freeCells = this.freeCells;
-        for (const freeCell of freeCells) {
-            freeCell.potentialValues = missingValues.filter(value => {
-                switch (this.entityType) {
-                    case "square":
-                        return !freeCell.lineEntity.hasValue(value) &&
-                            !freeCell.columnEntity.hasValue(value);
-                    case "column":
-                        return !freeCell.squareEntity.hasValue(value) &&
-                            !freeCell.columnEntity.hasValue(value);
-                    case "line":
-                        return !freeCell.squareEntity.hasValue(value) &&
-                            !freeCell.lineEntity.hasValue(value);
-                }
-            });
-            if (freeCell.potentialValues.length === 1) {
-                return this.settingCell(freeCell, freeCell.potentialValues[0], "solveByElimination");
-            }
-        }
-        return [];
+        return this._missingValues;
     }
 }
 
@@ -250,8 +129,8 @@ export class Square extends GridSubCollection {
     lines: number[];
     columns: number[];
 
-    constructor(grid: Grid, index: number) {
-        super(grid, index, "square");
+    constructor(index: number) {
+        super(index, "square");
         const verticalBlock = Math.floor(index / 3);
         const horizontalBlock = index % 3;
         this.lines = [];
@@ -264,36 +143,14 @@ export class Square extends GridSubCollection {
         }
     }
 
-    solveValuesByComplexCross(): Cell[] {
-        if (this.solved) {
-            return [];
-        }
-        const missingValues = this.missingValues;
-        for (const v of missingValues) {
-            const availableCells: Cell[] = [];
-            const freeCells = this.freeCells;
-            for (const cell of freeCells) {
-                if (!cell.lineEntity.hasValueNotOnSquare(v, this) &&
-                    !cell.columnEntity.hasValueNotOnSquare(v, this)) {
-                    availableCells.push(cell);
-                }
-            }
-            if (availableCells.length === 1) {
-                const cell = availableCells[0];
-                return this.settingCell(cell, v, "solveValuesByComplexCross");
-            }
-        }
-        return [];
-    }
-
     hasCell({ line, column }: { line: number; column: number }) {
         return this.lines.some(l => l === line) && this.columns.some(c => c === column);
     }
 }
 
 export class Line extends GridSubCollection {
-    constructor(grid: Grid, index: number) {
-        super(grid, index, "line");
+    constructor(index: number) {
+        super(index, "line");
     }
 
     toString(): string {
@@ -309,8 +166,8 @@ export class Line extends GridSubCollection {
 }
 
 export class Column extends GridSubCollection {
-    constructor(grid: Grid, index: number) {
-        super(grid, index, "column");
+    constructor(index: number) {
+        super(index, "column");
     }
 }
 

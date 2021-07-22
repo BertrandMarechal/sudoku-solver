@@ -1,6 +1,7 @@
-import { Grid } from "./grid.model";
 import { sudokus } from "./data";
+import { SudokuSolver } from "./sudoku-solver.model";
 
 for (const sudoku of sudokus) {
-    new Grid(sudoku).solve();
+    const sudokuSolver = new SudokuSolver(sudoku);
+    sudokuSolver.solve();
 }

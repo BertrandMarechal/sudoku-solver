@@ -5,16 +5,21 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "ts-node src/index.ts"
+    "start": "ts-node src/index.ts",
+    "pptr": "ts-node src/pptr.ts"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@types/colors": "^1.2.1",
     "@types/config": "^0.0.39",
+    "@types/jest": "^26.0.24",
     "@types/node": "^16.0.0",
     "colors": "^1.4.0",
     "config": "^3.3.6",
+    "jest": "^27.0.6",
+    "puppeteer": "^10.1.0",
+    "ts-jest": "^27.0.3",
     "ts-node": "^10.0.0",
     "typescript": "^4.3.5"
   }
