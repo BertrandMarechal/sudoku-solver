@@ -1,5 +1,5 @@
 import { Cell } from "./cell.model";
-import { GridSubCollection, Square } from "./sub-collections.model";
+import { GridSubCollection } from "./sub-collections.model";
 import { CellResolution } from "./sudoku-solver.model";
 import { get } from "config";
 
@@ -117,7 +117,7 @@ export class SubCollectionSolver {
         return null;
     }
 
-    static solveValuesByComplexCross(subCollection: Square): CellResolution | null {
+    static solveValuesByComplexCross(subCollection: GridSubCollection): CellResolution | null {
         if (debug) {
             console.log(`solveValuesByComplexCross ${subCollection.entityType} ${subCollection.index + 1}`);
         }
@@ -129,8 +129,22 @@ export class SubCollectionSolver {
             const availableCells: Cell[] = [];
             const freeCells = subCollection.freeCells;
             for (const cell of freeCells) {
-                if (!cell.lineEntity.hasValueNotOnSquare(v, subCollection) &&
-                    !cell.columnEntity.hasValueNotOnSquare(v, subCollection)) {
+                let isAvailable = false;
+                switch (subCollection.entityType) {
+                    case "square":
+                        isAvailable = !cell.lineEntity.hasValueExtended(v, subCollection) &&
+                            !cell.columnEntity.hasValueExtended(v, subCollection);
+                        break;
+                    case "column":
+                        isAvailable = !cell.squareEntity.hasValue(v) &&
+                            !cell.lineEntity.hasValueExtended(v, subCollection);
+                        break;
+                    case "line":
+                        isAvailable = !cell.squareEntity.hasValue(v) &&
+                            !cell.columnEntity.hasValueExtended(v, subCollection);
+                        break;
+                }
+                if (isAvailable) {
                     availableCells.push(cell);
                 }
             }
@@ -146,5 +160,4 @@ export class SubCollectionSolver {
         }
         return null;
     }
-
 }

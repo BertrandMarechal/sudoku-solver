@@ -6,6 +6,7 @@ const verbose = get<boolean>('verbose');
 export const oneToNine = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 export type EntityType = "unset" | "square" | "line" | "column" | "value";
+export type HasValueExtendedParams = { line: number, column?: never } | { line?: never, column: number };
 
 export class GridSubCollection {
     protected _cells: Cell[];
@@ -15,6 +16,8 @@ export class GridSubCollection {
     index: number;
     lockedOnPositions: Record<number, Cell[]>;
     foundValues: Record<number, Cell | null>;
+    lines: number[];
+    columns: number[];
     private _missingValues: number[];
     private _freeCells: Cell[];
 
@@ -24,6 +27,8 @@ export class GridSubCollection {
 
     constructor(index: number, entityType: EntityType = "unset") {
         this.entityType = entityType;
+        this.lines = [];
+        this.columns = [];
         this._cells = [];
         this.index = index;
         this.solved = false;
@@ -58,7 +63,7 @@ export class GridSubCollection {
     cellSet(cell: Cell) {
         const value = cell.value;
         if (value) {
-            const alreadyFound =this.foundValues[value];
+            const alreadyFound = this.foundValues[value];
             if (!!alreadyFound &&
                 (
                     cell.column !== alreadyFound?.column ||
@@ -96,7 +101,7 @@ export class GridSubCollection {
         return !!this.foundValues[valueToCheck];
     }
 
-    hasValueNotOnSquare(valueToCheck: number, square: Square): boolean {
+    hasValueExtended(valueToCheck: number, subCollection: GridSubCollection): boolean {
         const hasValue = this.hasValue(valueToCheck);
         if (hasValue) {
             return true;
@@ -104,12 +109,11 @@ export class GridSubCollection {
         if (this.lockedOnPositions[valueToCheck]) {
             if (this.entityType === "line") {
                 return this.lockedOnPositions[valueToCheck].some(cell => {
-                    return !square.columns.some(e => e === cell.column);
+                    return !subCollection.columns.some(e => e === cell.column);
                 });
             } else if (this.entityType === "column") {
                 return this.lockedOnPositions[valueToCheck].some(cell => {
-
-                    return !square.lines.some(e => e === cell.line);
+                    return !subCollection.lines.some(e => e === cell.line);
                 });
             }
         }
@@ -126,9 +130,6 @@ export class GridSubCollection {
 }
 
 export class Square extends GridSubCollection {
-    lines: number[];
-    columns: number[];
-
     constructor(index: number) {
         super(index, "square");
         const verticalBlock = Math.floor(index / 3);
@@ -151,6 +152,13 @@ export class Square extends GridSubCollection {
 export class Line extends GridSubCollection {
     constructor(index: number) {
         super(index, "line");
+        if (index < 3) {
+            this.lines = [0, 1, 2];
+        } else if (index < 6) {
+            this.lines = [3, 4, 5];
+        } else {
+            this.lines = [6, 7, 8];
+        }
     }
 
     toString(): string {
@@ -168,6 +176,13 @@ export class Line extends GridSubCollection {
 export class Column extends GridSubCollection {
     constructor(index: number) {
         super(index, "column");
+        if (index < 3) {
+            this.columns = [0, 1, 2];
+        } else if (index < 6) {
+            this.columns = [3, 4, 5];
+        } else {
+            this.columns = [6, 7, 8];
+        }
     }
 }
 

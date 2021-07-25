@@ -2,7 +2,17 @@ import puppeteer from 'puppeteer';
 import { SudokuSolver } from './sudoku-solver.model';
 import * as fs from "fs";
 
-const levels = ['easy', 'medium', 'hard', 'expert'];
+type Level =
+    | 'easy'
+    | 'medium'
+    | 'hard'
+    | 'expert'
+const levels: Level[] = [
+    'easy',
+    'medium',
+    'hard',
+    'expert'
+];
 
 async function fillSudoku(page: puppeteer.Page, values: { line: number, column: number, value: number }[]) {
     if (values) {
@@ -31,6 +41,34 @@ async function fillSudoku(page: puppeteer.Page, values: { line: number, column: 
     }
 }
 
+async function saveResult(level: Level, solved: boolean) {
+    let data: {
+        mission: string;
+        solution: string;
+        difficulty: { type: String };
+        id: number;
+        solved: boolean;
+    }[];
+    try {
+        data = JSON.parse(fs.readFileSync(`./data/${level}s.json`).toString('ascii'));
+    } catch {
+        data = [];
+    }
+    const current: {
+        mission: string;
+        solution: string;
+        difficulty: { type: String };
+        id: number;
+    } = JSON.parse(fs.readFileSync(`./data/${level}.json`).toString('ascii'));
+    let currentIndex = data.findIndex(({id}) => id === current.id);
+    if (currentIndex > -1) {
+        data[currentIndex].solved = solved;
+    } else {
+        data.push({ ...current, solved });
+    }
+    fs.writeFileSync(`./data/${level}s.json`, JSON.stringify(data, null, 2));
+}
+
 (async () => {
     const browser = await puppeteer.launch({
         headless: false
@@ -42,10 +80,11 @@ async function fillSudoku(page: puppeteer.Page, values: { line: number, column: 
     };
     page.on('response', async (response) => {
         if (response.request().method().toLowerCase() === 'get' && response.url().indexOf(`/api/level/`) > -1) {
-            const { mission, solution, difficulty } = await response.json();
+            const data = await response.json();
+            const { mission, solution, difficulty } = data;
             sudoku.solution = solution;
             sudoku.mission = mission;
-            fs.writeFileSync(`./data/${difficulty.type}.json`, JSON.stringify({ mission, solution }, null, 2));
+            fs.writeFileSync(`./data/${difficulty.type}.json`, JSON.stringify(data, null, 2));
         }
     });
     for (const level of levels) {
@@ -68,7 +107,9 @@ async function fillSudoku(page: puppeteer.Page, values: { line: number, column: 
             await new Promise(resolve => setTimeout(resolve, 100));
         }
         const sudokuSolver = new SudokuSolver(sudoku.mission.replace(/0/g, ' '));
+        await saveResult(level, false);
         sudokuSolver.solve();
+        await saveResult(level, sudokuSolver.solved);
         if (sudokuSolver.solved) {
             await fillSudoku(page, sudokuSolver.getSolution());
         }

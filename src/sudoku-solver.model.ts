@@ -43,13 +43,19 @@ export class CellResolution {
 
 }
 
+interface GridOption {
+    grid?: Grid;
+    option?: { value: number, cell: Cell };
+}
+
 export class SudokuSolver {
-    private _grids: { grid: Grid, option?: { value: number, cell: Cell } }[];
+    private _grids: GridOption[];
     private _originalGrid: Grid;
     private _currentGrid: Grid;
     private _cellsToCheck: Cell[];
     private _solved: boolean;
     private _currentVariationIndex: number;
+    private _totalGridCount: number;
 
     constructor(gridAsString: string) {
         const grid = new Grid(gridAsString, 0);
@@ -63,6 +69,7 @@ export class SudokuSolver {
 
         this._cellsToCheck = [];
         this._currentVariationIndex = 0;
+        this._totalGridCount = 1;
     }
 
     get solved(): boolean {
@@ -70,7 +77,11 @@ export class SudokuSolver {
     }
 
     getSolution(): { line: number, column: number, value: number }[] {
-        return this._grids.find(({grid}) => grid.solved)?.grid.getCellsToFill() || [];
+        const firstSolution = this._grids.find(({ grid }) => grid?.solved);
+        if (firstSolution) {
+            return (firstSolution.grid as Grid).getCellsToFill(this._originalGrid) || [];
+        }
+        return [];
     }
 
     solve() {
@@ -84,14 +95,23 @@ export class SudokuSolver {
                     this._solveCellsFromCell();
                     cellResolution = this._solveStepByStep();
                 }
-                this._currentGrid.solved = this.isGridSolved(this._currentGrid);
+                this._currentGrid.checkSolved();
                 this._solved = this._currentGrid.solved;
                 if (!this._solved) {
+                    if (debug) {
+                        this._currentGrid.print();
+                    }
                     carryOn = this._getNextGrid();
                 } else {
-                    carryOn = false;
+                    if (stopOnFirstSuccessfulSubGrid) {
+                        carryOn = false;
+                    }
                 }
             } catch (e) {
+                if (debug) {
+                    console.log(e);
+                    this._currentGrid.print();
+                }
                 this._currentGrid.solved = false;
                 this._currentGrid.valid = false;
                 carryOn = this._getNextGrid(true);
@@ -104,7 +124,7 @@ export class SudokuSolver {
                 }
             }
         }
-        if (this._grids.some(grid => grid.grid.solved)) {
+        if (this._grids.some(({ grid }) => grid?.solved)) {
             console.log(`Solved`);
         } else {
             console.log(`Not solved`);
@@ -126,6 +146,7 @@ export class SudokuSolver {
             } else {
                 this._cellsToCheck.pop();
             }
+            this._currentGrid.checkSolved();
         }
     }
 
@@ -140,7 +161,7 @@ export class SudokuSolver {
     }
 
     private _solveStepByStep(): CellResolution | null {
-        this._isCurrentGridKnown();
+        this._currentGrid.checkSolved();
         return this._solveIfOneValueMissing() ||
             this._solveIfOneIsMissing() ||
             this._solveValuesBySimpleCross() ||
@@ -214,7 +235,7 @@ export class SudokuSolver {
     }
 
     private _solveFromCloseBy(): CellResolution | null {
-        if(debug){
+        if (debug) {
             console.log('_solveFromCloseBy');
         }
         for (const line of this._currentGrid.lines) {
@@ -263,33 +284,40 @@ export class SudokuSolver {
         let cellResolution: CellResolution | null = null;
         let i = 0;
         while (!cellResolution && i < 9) {
-            cellResolution = SubCollectionSolver.solveValuesByComplexCross(this._currentGrid.squares[i]);
+            cellResolution = SubCollectionSolver.solveValuesByComplexCross(this._currentGrid.squares[i])
+                || SubCollectionSolver.solveValuesByComplexCross(this._currentGrid.lines[i])
+                || SubCollectionSolver.solveValuesByComplexCross(this._currentGrid.columns[i])
+                || null
+            ;
             i++;
         }
         return cellResolution;
     }
 
-    private _isCurrentGridKnown(): boolean {
-        const regExpString = this._currentGrid.toRawRegExpString();
-        const known = this._grids.some(({ grid }) =>
-            grid !== this._currentGrid &&
-            !new RegExp('$' + grid.path).test(this._currentGrid.path) &&
-            new RegExp(regExpString).test(grid.endRawText)
-        );
-        if (known) {
-            if (verbose) {
-                console.log(levelToSpaces(this._currentGrid) + 'Grid variant is known');
-            }
-            throw new Error('Grid vVariant is known');
-        }
-        return known;
-    }
-
-    private _getNextGrid(justMoveForward: boolean = false): boolean {
+    private _getNextGrid(lastOneWasInvalid: boolean = false): boolean {
         this._currentVariationIndex++;
-        this._currentGrid.endRawText = this._currentGrid.toRawString();
-        if (!justMoveForward) {
-            const cellsToFill = this._currentGrid.cells.filter(({ value }) => !value);
+
+        if (!lastOneWasInvalid) {
+            const cellsRepresentation: Record<number, number> = {
+                1: 0,
+                2: 0,
+                3: 0,
+                4: 0,
+                5: 0,
+                6: 0,
+                7: 0,
+                8: 0,
+                9: 0,
+            };
+            const cellsToFill: Cell[] = [];
+            for (const cell of this._currentGrid.cells) {
+                if (!cell.value) {
+                    cellsToFill.push(cell);
+                } else {
+                    cellsRepresentation[cell.value]++;
+                }
+            }
+            this._currentGrid.cells.filter(({ value }) => !value);
             for (const cellToFill of cellsToFill) {
                 cellToFill.potentialValues = [...oneToNine].filter(value =>
                     !cellToFill.lineEntity.hasValue(value) &&
@@ -297,19 +325,26 @@ export class SudokuSolver {
                     !cellToFill.squareEntity.hasValue(value)
                 );
             }
-            cellsToFill.sort((a, b) => a.potentialValues.length - b.potentialValues.length);
             let variationsCount = 0;
+            const options: { cell: Cell, value: number }[] = [];
             for (let cell of cellsToFill) {
                 for (const value of cell.potentialValues) {
                     variationsCount++;
-                    this._grids.splice(this._currentVariationIndex, 0, {
-                        grid: new Grid(this._currentGrid.toRawString({
-                            cell,
-                            value
-                        }), this._grids.length, this._currentGrid),
-                        option: { cell, value }
-                    });
+                    options.push({ cell, value });
                 }
+            }
+            options.sort((a, b) => {
+                if (cellsRepresentation[a.value] === cellsRepresentation[b.value]) {
+                    return a.cell.potentialValues.length - b.cell.potentialValues.length;
+                }
+                return cellsRepresentation[b.value] - cellsRepresentation[a.value];
+            });
+            for (const option of options) {
+                this._grids.splice(this._currentVariationIndex, 0, {
+                    grid: new Grid(this._currentGrid.toRawString(option), this._totalGridCount, this._currentGrid),
+                    option: option
+                });
+                this._totalGridCount++;
             }
             if (variationsCount) {
                 if (verbose) {
@@ -332,13 +367,13 @@ export class SudokuSolver {
                 console.log('No more variations to try');
             }
         }
-        this._currentGrid = this._grids[this._currentVariationIndex]?.grid;
+        this._currentGrid.clear();
+        if (!this._currentGrid.solved) {
+            this._grids[this._currentVariationIndex - 1].grid = undefined;
+        }
+        this._currentGrid = this._grids[this._currentVariationIndex]?.grid as Grid;
 
         return !!this._currentGrid;
-    }
-
-    isGridSolved(grid: Grid) {
-        return grid.squares.every(square => square.solved);
     }
 }
 

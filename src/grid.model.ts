@@ -1,38 +1,25 @@
 import { Cell } from "./cell.model";
 import { Column, Line, Square } from "./sub-collections.model";
-import { get } from "config";
-
-const stopOnFirstSuccessfulSubGrid = get<boolean>('stopOnFirstSuccessfulSubGrid');
 
 export class Grid {
-    parent: Grid | null;
-    subGrids: Grid[];
     cells: Cell[];
     squares: Square[];
     columns: Column[];
     lines: Line[];
     solved: boolean;
     valid: boolean;
-    known: boolean;
-    startTime: number;
-    endTime: number;
-    totalTime: number;
     level: number;
     index: number;
     path: string;
-    endRawText: string;
 
     constructor(grid: string, index: number, parent: Grid | null = null) {
-        this.subGrids = [];
         this.cells = [];
         this.squares = [];
         this.columns = [];
         this.lines = [];
         this.solved = false;
         this.valid = true;
-        this.known = false;
         this.init(grid);
-        this.parent = parent;
         this.level = 0;
         this.index = index;
         if (parent) {
@@ -41,10 +28,6 @@ export class Grid {
         } else {
             this.path = `${index}`;
         }
-        this.startTime = new Date().getTime();
-        this.endTime = new Date().getTime();
-        this.totalTime = new Date().getTime();
-        this.endRawText = "";
     }
 
     init(grid: string) {
@@ -66,6 +49,15 @@ export class Grid {
             }));
     }
 
+    clear() {
+        if (this.index !== 0 && (!this.solved || !this.valid)) {
+            this.cells = [];
+            this.squares = [];
+            this.lines = [];
+            this.columns = [];
+        }
+    }
+
     print() {
         console.log(this.toString());
     }
@@ -83,22 +75,19 @@ export class Grid {
     }
 
     toRawString(params?: { cell: Cell, value: number }) {
-        return this.cells.map((currentCell) => {
-            if (
-                params &&
-                params.cell.line === currentCell.line &&
-                params.cell.column === currentCell.column
-            ) {
-                return params.value;
-            }
-            return currentCell.toRawString();
-        }).join('');
-    }
-
-    toRawRegExpString() {
-        return this.cells.map((currentCell) =>
-            currentCell.toRawString('.')
-        ).join('');
+        if (params) {
+            return this.cells.map((currentCell) => {
+                if (
+                    params &&
+                    params.cell.line === currentCell.line &&
+                    params.cell.column === currentCell.column
+                ) {
+                    return params.value;
+                }
+                return currentCell.toRawString();
+            }).join('');
+        }
+        return this.cells.map((currentCell) => currentCell.toRawString()).join('');
     }
 
     checkSolved() {
@@ -108,17 +97,10 @@ export class Grid {
             this.columns.every(({ solved }) => solved);
     }
 
-    checkValid() {
-        this.valid =
-            this.squares.every(({ valid }) => valid) &&
-            this.lines.every(({ valid }) => valid) &&
-            this.columns.every(({ valid }) => valid);
-    }
-
-    getCellsToFill(): { line: number, column: number, value: number }[] {
+    getCellsToFill(originalGrid: Grid): { line: number, column: number, value: number }[] {
         return this.cells
-            .filter(({initiallySet}) => !initiallySet)
-            .map(({line, column, value}) => ({line, column, value: value || 0}));
+            .filter((cell, i) => !originalGrid.cells[i].initiallySet)
+            .map(({ line, column, value }) => ({ line, column, value: value || 0 }));
     }
 }
 

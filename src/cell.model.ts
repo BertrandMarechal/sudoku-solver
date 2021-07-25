@@ -11,12 +11,14 @@ export class Cell {
         this.lineEntity.cellSet(this);
         this.squareEntity.cellSet(this);
     }
+
     get value(): number | null {
         return this._value;
     }
 
     column: number;
     line: number;
+    square: number;
     initiallySet: boolean;
     private _value: number | null;
     potentialValues: number[];
@@ -37,6 +39,7 @@ export class Cell {
         this.initiallySet = !!value;
         this.column = index % 9;
         this.line = Math.floor(index / 9);
+        this.square = square.index;
         this.potentialValues = [];
         this.lineEntity = line;
         this.columnEntity = column;

@@ -1,2 +1,6 @@
 /node_modules
 /coverage
+/data/easy.json
+/data/medium.json
+/data/hard.json
+/data/expert.json
