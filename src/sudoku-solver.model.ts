@@ -67,12 +67,16 @@ export class SudokuSolver {
     private _solved: boolean;
     private _currentVariationIndex: number;
     private _totalGridCount: number;
+    private _startTime: number;
+    private _timeout: number;
 
     constructor(gridAsString: string) {
         const grid = new Grid(gridAsString, 0);
         if (verbose) {
             grid.print();
         }
+        this._startTime = 0;
+        this._timeout = 0;
         this._originalGrid = grid;
         this._currentGrid = grid;
         this._grids = [{ grid }];
@@ -95,7 +99,11 @@ export class SudokuSolver {
         return [];
     }
 
-    solve() {
+    solve(params?: {
+        timeout: number;
+    }) {
+        this._startTime = new Date().getTime();
+        this._timeout = params?.timeout || 0;
         let carryOn = true;
         while (carryOn) {
             try {
@@ -111,6 +119,7 @@ export class SudokuSolver {
                 if (!this._solved) {
                     if (debug) {
                         this._currentGrid.print();
+                        // process.exit();
                     }
                     carryOn = this._getNextGrid();
                 } else {
@@ -133,9 +142,14 @@ export class SudokuSolver {
                         console.log(`Solved: ${this._currentGrid.solved}`);
                     }
                 }
+                if (this._timeout) {
+                    if (new Date().getTime() - this._startTime > this._timeout) {
+                        carryOn = false;
+                    }
+                }
             }
         }
-        if (this._grids.some(({ grid }) => grid?.solved)) {
+        if (this._solved) {
             console.log(`Solved`);
         } else {
             console.log(`Not solved`);

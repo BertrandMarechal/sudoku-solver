@@ -108,7 +108,7 @@ async function saveResult(level: Level, solved: boolean) {
         }
         const sudokuSolver = new SudokuSolver(sudoku.mission.replace(/0/g, ' '));
         await saveResult(level, false);
-        sudokuSolver.solve();
+        sudokuSolver.solve({ timeout: 5000 });
         await saveResult(level, sudokuSolver.solved);
         if (sudokuSolver.solved) {
             await fillSudoku(page, sudokuSolver.getSolution());
