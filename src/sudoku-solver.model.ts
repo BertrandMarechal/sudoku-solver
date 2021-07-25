@@ -17,6 +17,10 @@ export type CellResolutionOrigin =
     | "solveValuesByComplexCross";
 
 export class CellResolution {
+    get cost(): number {
+        return this._cost;
+    }
+
     get origin(): CellResolutionOrigin {
         return this._origin;
     }
@@ -32,13 +36,20 @@ export class CellResolution {
     private _cell: Cell;
     private _origin: CellResolutionOrigin;
     private _entity?: GridSubCollection;
+    private _cost: number;
 
     constructor(
-        { cell, origin, entity }: { cell: Cell, origin: CellResolutionOrigin, entity?: GridSubCollection }
+        {
+            cell,
+            origin,
+            entity,
+            cost
+        }: { cell: Cell, origin: CellResolutionOrigin, entity?: GridSubCollection, cost: number }
     ) {
         this._cell = cell;
         this._origin = origin;
         this._entity = entity;
+        this._cost = cost;
     }
 
 }
@@ -171,24 +182,29 @@ export class SudokuSolver {
     }
 
     private _solveIfOneValueMissing(): CellResolution | null {
+        let cost = 0;
         for (let v = 1; v < 10; v++) {
-            const [lines, columns] = this._currentGrid.cells.reduce((
-                [lines, columns]: [number[], number[]],
-                { value, line, column }) => {
-                if (value === v) {
-                    return [
-                        lines.filter(l => l !== line),
-                        columns.filter(l => l !== column),
-                    ];
-                }
-                return [lines, columns];
-            }, [oneToNine.map(i => i - 1), oneToNine.map(i => i - 1)]);
+            const [lines, columns] = this._currentGrid.cells.reduce(
+                (
+                    [lines, columns]: [number[], number[]],
+                    { value, line, column }
+                ) => {
+                    if (value === v) {
+                        cost++;
+                        return [
+                            lines.filter(l => l !== line),
+                            columns.filter(l => l !== column),
+                        ];
+                    }
+                    return [lines, columns];
+                }, [oneToNine.map(i => i - 1), oneToNine.map(i => i - 1)]);
             if (lines.length === 1 && columns.length === 1) {
                 const [line, column] = [lines[0], columns[0]];
                 this._currentGrid.cells[line * 9 + column].value = v;
                 return new CellResolution({
                     cell: this._currentGrid.cells[line * 9 + column],
                     origin: "solveIfOneValueMissing",
+                    cost,
                 });
             }
         }

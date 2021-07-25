@@ -18,6 +18,7 @@ export class SubCollectionSolver {
         if (subCollection.solved) {
             return null;
         }
+        let cost = 0;
         const missingValues = subCollection.missingValues;
         for (const v of missingValues) {
             const availableCells: Cell[] = [];
@@ -28,14 +29,17 @@ export class SubCollectionSolver {
                     case "square":
                         isAvailable = !cell.lineEntity.hasValue(v) &&
                             !cell.columnEntity.hasValue(v);
+                        cost += 2;
                         break;
                     case "column":
                         isAvailable = !cell.squareEntity.hasValue(v) &&
                             !cell.lineEntity.hasValue(v);
+                        cost += 2;
                         break;
                     case "line":
                         isAvailable = !cell.squareEntity.hasValue(v) &&
                             !cell.columnEntity.hasValue(v);
+                        cost += 2;
                         break;
                 }
                 if (isAvailable) {
@@ -48,6 +52,7 @@ export class SubCollectionSolver {
                     cell: availableCells[0],
                     origin: "solveValuesBySimpleCross",
                     entity: subCollection,
+                    cost,
                 });
             }
         }
@@ -65,14 +70,17 @@ export class SubCollectionSolver {
         if (subCollection.solved) {
             return null;
         }
+        let cost = 0;
         let missingValues = subCollection.missingValues;
         if (missingValues.length === 1) {
+            cost++;
             const cell = subCollection.freeCells[0];
             cell.value = missingValues[0];
             return new CellResolution({
                 cell,
                 origin: "solveIfOneMissing",
                 entity: subCollection,
+                cost,
             });
         }
         return null;
@@ -89,18 +97,22 @@ export class SubCollectionSolver {
         if (subCollection.solved) {
             return null;
         }
+        let cost = 0;
         const missingValues = subCollection.missingValues;
         const freeCells = subCollection.freeCells;
         for (const freeCell of freeCells) {
             freeCell.potentialValues = missingValues.filter(value => {
                 switch (subCollection.entityType) {
                     case "square":
+                        cost += 2;
                         return !freeCell.lineEntity.hasValue(value) &&
                             !freeCell.columnEntity.hasValue(value);
                     case "column":
+                        cost += 2;
                         return !freeCell.squareEntity.hasValue(value) &&
                             !freeCell.columnEntity.hasValue(value);
                     case "line":
+                        cost += 2;
                         return !freeCell.squareEntity.hasValue(value) &&
                             !freeCell.lineEntity.hasValue(value);
                 }
@@ -111,12 +123,17 @@ export class SubCollectionSolver {
                     cell: freeCell,
                     origin: "solveByElimination",
                     entity: subCollection,
+                    cost,
                 });
             }
         }
         return null;
     }
 
+    /**
+     * Tries to solve the sub collection based on the values we found will be on one line or column
+     * @param subCollection
+     */
     static solveValuesByComplexCross(subCollection: GridSubCollection): CellResolution | null {
         if (debug) {
             console.log(`solveValuesByComplexCross ${subCollection.entityType} ${subCollection.index + 1}`);
@@ -124,6 +141,7 @@ export class SubCollectionSolver {
         if (subCollection.solved) {
             return null;
         }
+        let cost = 0;
         const missingValues = subCollection.missingValues;
         for (const v of missingValues) {
             const availableCells: Cell[] = [];
@@ -132,14 +150,17 @@ export class SubCollectionSolver {
                 let isAvailable = false;
                 switch (subCollection.entityType) {
                     case "square":
+                        cost += 2;
                         isAvailable = !cell.lineEntity.hasValueExtended(v, subCollection) &&
                             !cell.columnEntity.hasValueExtended(v, subCollection);
                         break;
                     case "column":
+                        cost += 2;
                         isAvailable = !cell.squareEntity.hasValue(v) &&
                             !cell.lineEntity.hasValueExtended(v, subCollection);
                         break;
                     case "line":
+                        cost += 2;
                         isAvailable = !cell.squareEntity.hasValue(v) &&
                             !cell.columnEntity.hasValueExtended(v, subCollection);
                         break;
@@ -155,6 +176,7 @@ export class SubCollectionSolver {
                     cell,
                     origin: "solveValuesByComplexCross",
                     entity: subCollection,
+                    cost,
                 });
             }
         }

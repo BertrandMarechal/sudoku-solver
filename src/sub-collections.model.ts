@@ -86,13 +86,14 @@ export class GridSubCollection {
         }
     }
 
+    lockValueToCells(value: number, cells: Cell[]): void {
+        this.lockedOnPositions[value] = cells;
+    }
+
     resetLockedOnPositions(): void {
         this.lockedOnPositions = {};
     }
 
-    lockValueToCells(value: number, cells: Cell[]): void {
-        this.lockedOnPositions[value] = cells;
-    }
 
     hasValue(valueToCheck: number): boolean {
         if (this.solved) {
@@ -102,6 +103,9 @@ export class GridSubCollection {
     }
 
     hasValueExtended(valueToCheck: number, subCollection: GridSubCollection): boolean {
+        if (this.solved) {
+            return true;
+        }
         const hasValue = this.hasValue(valueToCheck);
         if (hasValue) {
             return true;
